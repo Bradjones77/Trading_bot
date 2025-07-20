@@ -1,18 +1,19 @@
-from telegram import Bot
-from telegram.ext import Updater, CommandHandler
+from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import Update
 
-def start(update, context):
-    update.message.reply_text("Hello! Bot is running.")
+BOT_TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("👋 Hello! Your trading bot is online and working.")
 
 def main():
-    # Replace YOUR_TOKEN_HERE with your actual Telegram bot token
-    updater = Updater("YOUR_TOKEN_HERE", use_context=True)
-    dp = updater.dispatcher
+    application = Application.builder().token(BOT_TOKEN).build()
 
-    dp.add_handler(CommandHandler("start", start))
+    # Add /start command handler
+    application.add_handler(CommandHandler("start", start))
 
-    updater.start_polling()
-    updater.idle()
+    print("🤖 Bot is running...")
+    application.run_polling()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
