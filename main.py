@@ -80,4 +80,34 @@ async def confidence(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("❓ Usage: /confidence [coin]")
         return
+    coin_id = context.args[0].lower()
+    url = f"https://api.coingecko.com/api/v3/coins/markets"
+    params = {
+        "vs_currency": "usd",
+        "ids": coin_id
+    }
 
+    response = requests.get(url, params=params)
+    if response.status_code != 200 or not response.json():
+        await update.message.reply_text("❌ Coin not found.")
+        return
+
+    coin = response.json()[0]
+    change = coin.get("price_change_percentage_24h", 0)
+    confidence = round(min(max(change * 3, 60), 95), 2)
+    await update.message.reply_text(f"📊 Confidence for {coin['name']}: {confidence}%")
+
+def main():
+    application = Application.builder().token(BOT_TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("signal", signal))
+    application.add_handler(CommandHandler("longterm", longterm))
+    application.add_handler(CommandHandler("watchlist", watchlist))
+    application.add_handler(CommandHandler("confidence", confidence))
+
+    print("🚀 Bot is live and watching the market.")
+    application.run_polling()
+
+if __name__ == "__main__":
+    main()
