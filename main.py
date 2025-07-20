@@ -1,73 +1,83 @@
+import requests
 from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram import Update
-import random
 import datetime
 
 BOT_TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"
 
-# Example coin signal data (to be replaced with real API signals)
-coin_signals = [
-    {
-        "name": "PepeCoin",
-        "entry_price": 0.0000031,
-        "target_price": 0.0000050,
-        "stop_loss": 0.0000028,
-        "confidence": 92,
-        "type": "short"
-    },
-    {
-        "name": "Shiba Inu",
-        "entry_price": 0.000017,
-        "target_price": 0.000021,
-        "stop_loss": 0.000015,
-        "confidence": 85,
-        "type": "short"
-    },
-    {
-        "name": "Solana",
-        "entry_price": 165.0,
-        "target_price": 210.0,
-        "stop_loss": 150.0,
-        "confidence": 78,
-        "type": "long"
-    }
-]
+WATCHLIST = ['pepe', 'shiba-inu', 'solana']
+LONG_TERM = ['bitcoin', 'ethereum', 'solana']
 
-# Sort by most profitable/confident first
-coin_signals = sorted(coin_signals, key=lambda x: -x['confidence'])
+def fetch_top_signal():
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+    params = {
+        "vs_currency": "usd",
+        "order": "market_cap_desc",
+        "per_page": 100,
+        "page": 1,
+        "sparkline": "false"
+    }
+
+    try:
+        response = requests.get(url, params=params)
+        data = response.json()
+
+        candidates = [coin for coin in data if coin['id'] in WATCHLIST]
+        if not candidates:
+            return None
+
+        # Sort by % gain in last 24h
+        best = sorted(candidates, key=lambda x: x['price_change_percentage_24h'] or 0, reverse=True)[0]
+
+        return {
+            "name": best["name"],
+            "symbol": best["symbol"].upper(),
+            "price": best["current_price"],
+            "change": best["price_change_percentage_24h"],
+            "market_cap": best["market_cap"],
+            "confidence": round(min(max(best["price_change_percentage_24h"] * 3, 60), 95), 2),  # simple confidence model
+        }
+
+    except Exception as e:
+        print("Error:", e)
+        return None
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Welcome! I’ll now send you the best crypto trading signals.")
+    await update.message.reply_text("👋 Welcome! Send /signal to get the top crypto to trade now.")
 
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.now().time()
     if not (datetime.time(5, 0) <= now <= datetime.time(22, 0)):
-        await update.message.reply_text("⏱ Signals are only sent between 5am and 10pm.")
+        await update.message.reply_text("⏱ Signals are only active between 5am and 10pm.")
         return
 
-    best_signal = coin_signals[0]
-    msg = f"""💰 *Top Signal Right Now* 💰
+    signal = fetch_top_signal()
+    if not signal:
+        await update.message.reply_text("❌ No strong signals right now.")
+        return
 
-📈 Coin: *{best_signal['name']}*
-📍 Entry Price: `{best_signal['entry_price']}`
-🎯 Target: `{best_signal['target_price']}`
-🛑 Stop Loss: `{best_signal['stop_loss']}`
-📊 Confidence: *{best_signal['confidence']}%*
-🕒 Type: *{best_signal['type'].capitalize()} Trade*
+    msg = f"""📡 *Signal Alert*
 
-I'll let you know when to sell or buy based on the market. ✅
+💸 Coin: *{signal['name']}* (`{signal['symbol']}`)
+💰 Current Price: `${signal['price']}`
+📈 24h Change: `{signal['change']}%`
+📊 Confidence: *{signal['confidence']}%*
+
+Set alerts! I'll follow up if it flips trend. ✅
 """
     await update.message.reply_markdown(msg)
 
-def main():
-    application = Application.builder().token(BOT_TOKEN).build()
+async def longterm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    coins = ', '.join([name.capitalize() for name in LONG_TERM])
+    await update.message.reply_text(f"📦 Long-term holds: {coins}")
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("signal", signal))
+async def watchlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    coins = ', '.join([name.capitalize() for name in WATCHLIST])
+    await update.message.reply_text(f"🔍 Current watchlist: {coins}")
 
-    print("🚀 Bot is live and waiting...")
-    application.run_polling()
-
-if __name__ == "__main__":
-    main()
+async def confidence(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("❓ Usage: /confidence [coin]")
+        return
 
