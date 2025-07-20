@@ -1,39 +1,105 @@
-from telegram.ext import ApplicationBuilder, CommandHandler
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import logging
+import random
+import requests
+from apscheduler.schedulers.background import BackgroundScheduler
+import pytz
 
-# Your bot token (hardcoded here for testing only)
 TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"
+ADMIN_CHAT_ID = 123456789  # Replace this with YOUR Telegram user ID
 
-# Basic logging setup
+# Logging setup
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-async def start(update, context):
-    await update.message.reply_text("Hello! I am bradjones77_bot.")
+# === GET LIVE PRICE ===
+def get_price(symbol):
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol}&vs_currencies=usd"
+    r = requests.get(url)
+    data = r.json()
+    return data[symbol]['usd']
 
-async def signal(update, context):
-    # Example signal message
-    await update.message.reply_text("New trade signal: Buy BTC at $30,000. Expected profit: 5%. Stop loss: $29,000.")
+# === /start ===
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🤖 Bradjones77 Trade Bot Ready!\n\n"
+        "Commands:\n"
+        "/signal – Get a trade signal\n"
+        "/request – Request manual signal\n"
+        "/buy – Simulate buy\n"
+        "/sell – Simulate sell"
+    )
 
-async def request(update, context):
-    await update.message.reply_text("Trade signal requested! Generating your signal...")
+# === /signal ===
+async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    coin = random.choice([
+        {"id": "bitcoin", "symbol": "BTC/USDT"},
+        {"id": "ethereum", "symbol": "ETH/USDT"},
+        {"id": "solana", "symbol": "SOL/USDT"}
+    ])
+    price = get_price(coin['id'])
+    direction = random.choice(["BUY", "SELL"])
+    profit = round(random.uniform(5, 15), 2)
+    stop_loss = round(random.uniform(2, 4), 2)
 
-async def buy(update, context):
-    await update.message.reply_text("Buy alert! Consider buying now.")
+    msg = (
+        f"📊 *Live Trade Signal*\n"
+        f"Pair: `{coin['symbol']}`\n"
+        f"Direction: *{direction}*\n"
+        f"Price: *${price}*\n"
+        f"Target Profit: *{profit}%*\n"
+        f"Stop Loss: *{stop_loss}%*"
+    )
 
-async def sell(update, context):
-    await update.message.reply_text("Sell alert! Consider selling now.")
+    await update.message.reply_markdown(msg)
 
+# === /request ===
+async def request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await signal(update, context)
+
+# === /buy ===
+async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✅ Simulated Buy Placed.")
+
+# === /sell ===
+async def sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ Simulated Sell Executed.")
+
+# === SCHEDULED SIGNALS ===
+def schedule_signal(application):
+    async def send_scheduled_signal():
+        coin = {"id": "bitcoin", "symbol": "BTC/USDT"}
+        price = get_price(coin['id'])
+        profit = round(random.uniform(5, 15), 2)
+        stop_loss = round(random.uniform(2, 4), 2)
+
+        msg = (
+            f"🕒 *Hourly Trade Alert*\n"
+            f"Pair: `{coin['symbol']}`\n"
+            f"Price: *${price}*\n"
+            f"Profit Target: *{profit}%*\n"
+            f"Stop Loss: *{stop_loss}%*"
+        )
+        await application.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg, parse_mode='Markdown')
+
+    scheduler = BackgroundScheduler(timezone=pytz.utc)
+    scheduler.add_job(lambda: application.create_task(send_scheduled_signal()), 'interval', hours=1)
+    scheduler.start()
+
+# === MAIN ===
 def main():
-    application = ApplicationBuilder().token(TOKEN).build()
+    app = ApplicationBuilder().token(TOKEN).build()
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("signal", signal))
-    application.add_handler(CommandHandler("request", request))
-    application.add_handler(CommandHandler("buy", buy))
-    application.add_handler(CommandHandler("sell", sell))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("signal", signal))
+    app.add_handler(CommandHandler("request", request))
+    app.add_handler(CommandHandler("buy", buy))
+    app.add_handler(CommandHandler("sell", sell))
 
-    print("Bot started")
-    application.run_polling()
+    schedule_signal(app)
+
+    print("✅ Bot started.")
+    app.run_polling()
 
 if __name__ == '__main__':
     main()
