@@ -1,28 +1,18 @@
-import telegram
-import schedule
-import time
-from datetime import datetime
-from strategies import get_trade_signals
-from utils import format_signals
+from telegram import Bot
+from telegram.ext import Updater, CommandHandler
 
-# Embedded credentials (less secure — use with caution)
-TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"
-CHAT_ID = "@Bradjones77_bot"
+def start(update, context):
+    update.message.reply_text("Hello! Bot is running.")
 
-bot = telegram.Bot(token=TOKEN)
+def main():
+    # Replace YOUR_TOKEN_HERE with your actual Telegram bot token
+    updater = Updater("YOUR_TOKEN_HERE", use_context=True)
+    dp = updater.dispatcher
 
-def send_signals():
-    signals = get_trade_signals()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    message = f"📈 *Crypto Signals - {now}*\n\n"
-    message += format_signals(signals)
-    bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=telegram.ParseMode.MARKDOWN)
+    dp.add_handler(CommandHandler("start", start))
 
-# Schedule signals every hour between 5 AM and 10 PM
-for hour in range(5, 22):  # 5 to 21 inclusive
-    schedule.every().day.at(f"{hour:02}:00").do(send_signals)
+    updater.start_polling()
+    updater.idle()
 
-print("📡 Bot running with hourly signals from 5 AM to 10 PM...")
-while True:
-    schedule.run_pending()
-    time.sleep(60)
+if __name__ == '__main__':
+    main()
