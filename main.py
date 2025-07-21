@@ -23,7 +23,6 @@ def get_top_gainer():
     return f"📈 Best performing stock today: {top} (+{round(best*100,2)}%)"
 
 def get_long_term_pick():
-    # Placeholder for long-term logic
     return "📊 Long-term stock pick: AAPL (Strong earnings, reliable growth)"
 
 def get_short_term_pick():
@@ -60,11 +59,36 @@ def get_long_term_crypto():
 def get_short_term_crypto():
     return "💣 Short-term crypto trade: PEPE/USDT (Meme coin with breakout potential)"
 
-# --- FLASK ROUTES ---
+# --- BOT COMMANDS ---
 
 @app.route("/")
 def home():
     return "🚀 Smart Trading Bot is running"
+
+@app.route("/start")
+def start():
+    return (
+        "👋 Welcome to Smart Trading Bot!\n"
+        "Use /help to see available commands.\n"
+        "This bot scans the market 24/7 for smart trade signals in stocks & crypto."
+    )
+
+@app.route("/help")
+def help():
+    return (
+        "📘 Available Commands:\n\n"
+        "📈 Stock Signals:\n"
+        "  /signalstock     - Top stock gainer today\n"
+        "  /signalstock.l   - Long-term investment stock\n"
+        "  /signalstock.s   - Short-term/day trading stock\n\n"
+        "💰 Crypto Signals:\n"
+        "  /signalcrypto    - Top crypto gainer today\n"
+        "  /signalcrypto.l  - Long-term crypto pick\n"
+        "  /signalcrypto.s  - Short-term crypto play\n\n"
+        "🔍 Other:\n"
+        "  /start           - Bot introduction\n"
+        "  /help            - List of all commands"
+    )
 
 @app.route("/signalstock")
 def signal_stock():
@@ -92,3 +116,4 @@ def signal_crypto_short():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
