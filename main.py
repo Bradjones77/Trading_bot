@@ -4,6 +4,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import yfinance as yf
 import ccxt
 import pandas as pd
+import asyncio
 
 # --- Setup logging ---
 logging.basicConfig(
@@ -13,7 +14,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- Your Telegram Bot Token ---
-TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"  # Your actual token!
+TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"
 
 # --- Stock and Crypto Data ---
 stock_list = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA"]
@@ -138,7 +139,7 @@ async def signalcrypto_s(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_short_term_crypto())
 
 
-if __name__ == "__main__":
+async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     # Register commands
@@ -154,4 +155,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("signalcrypto_s", signalcrypto_s))
 
     logger.info("Bot started...")
-    app.run_polling()
+    await app.run_polling()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
