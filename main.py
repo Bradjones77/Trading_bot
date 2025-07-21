@@ -4,7 +4,6 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import yfinance as yf
 import ccxt
 import pandas as pd
-import asyncio
 
 # --- Setup logging ---
 logging.basicConfig(
@@ -138,7 +137,8 @@ async def signalcrypto_l(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def signalcrypto_s(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_short_term_crypto())
 
-async def main():
+
+if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
 
     # Register commands
@@ -154,7 +154,4 @@ async def main():
     app.add_handler(CommandHandler("signalcrypto_s", signalcrypto_s))
 
     logger.info("Bot started...")
-    await app.run_polling()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    app.run_polling()
