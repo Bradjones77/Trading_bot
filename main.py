@@ -1,7 +1,7 @@
 import logging
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-import yfinance as yf
 import ccxt
 import pandas as pd
 import asyncio
@@ -13,47 +13,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Your Telegram Bot Token ---
-TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"
+# --- Your Telegram Bot Token from environment ---
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-# --- Stock and Crypto Data ---
-stock_list = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA"]
+if not TOKEN:
+    logger.error("Telegram bot token not found! Please set the TELEGRAM_BOT_TOKEN environment variable.")
+    exit(1)
+
+# --- Crypto Data ---
 crypto_list = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "DOGE/USDT", "PEPE/USDT"]
 
 exchange = ccxt.binance()
-
-# --- Stock Signal Functions ---
-def get_top_gainer():
-    top = None
-    best = -999
-    for ticker in stock_list:
-        try:
-            df = yf.download(ticker, period="2d", interval="1d", progress=False)
-            logger.info(f"Fetched stock data for {ticker}: {df.tail(2)}")
-        except Exception as e:
-            logger.error(f"Failed to download stock data for {ticker}: {e}")
-            continue
-        if len(df) < 2:
-            logger.warning(f"Not enough stock data for {ticker}")
-            continue
-        try:
-            change = (df['Close'][-1] - df['Close'][-2]) / df['Close'][-2]
-        except Exception as e:
-            logger.error(f"Error calculating change for {ticker}: {e}")
-            continue
-        if change > best:
-            best = change
-            top = ticker
-    if top:
-        return f"📈 Best performing stock today: {top} (+{round(best*100, 2)}%)"
-    else:
-        return "❌ Could not fetch stock data."
-
-def get_long_term_pick():
-    return "📊 Long-term stock pick: AAPL (Strong earnings, reliable growth)"
-
-def get_short_term_pick():
-    return "💥 Short-term trade idea: NVDA (High momentum, near breakout zone)"
 
 # --- Crypto Signal Functions ---
 def get_ohlcv(symbol):
@@ -101,16 +71,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome to Smart Trading Bot!\n"
         "Use /help to see available commands.\n"
-        "This bot scans the market 24/7 for smart trade signals in stocks & crypto."
+        "This bot scans the crypto market 24/7 for smart trade signals."
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📘 Available Commands:\n\n"
-        "📈 Stock Signals:\n"
-        "  /signalstock     - Top stock gainer today\n"
-        "  /signalstock_l   - Long-term investment stock\n"
-        "  /signalstock_s   - Short-term/day trading stock\n\n"
         "💰 Crypto Signals:\n"
         "  /signalcrypto    - Top crypto gainer today\n"
         "  /signalcrypto_l  - Long-term crypto pick\n"
@@ -119,15 +85,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "  /start           - Bot introduction\n"
         "  /help            - List of all commands"
     )
-
-async def signalstock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(get_top_gainer())
-
-async def signalstock_l(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(get_long_term_pick())
-
-async def signalstock_s(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(get_short_term_pick())
 
 async def signalcrypto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_top_crypto())
@@ -144,10 +101,6 @@ async def main():
     # Register commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
-
-    app.add_handler(CommandHandler("signalstock", signalstock))
-    app.add_handler(CommandHandler("signalstock_l", signalstock_l))
-    app.add_handler(CommandHandler("signalstock_s", signalstock_s))
 
     app.add_handler(CommandHandler("signalcrypto", signalcrypto))
     app.add_handler(CommandHandler("signalcrypto_l", signalcrypto_l))
