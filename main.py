@@ -16,14 +16,12 @@ logger = logging.getLogger(__name__)
 TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"
 
 # --- Stock and Crypto Data ---
-
 stock_list = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA"]
 crypto_list = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "DOGE/USDT", "PEPE/USDT"]
 
 exchange = ccxt.binance()
 
 # --- Stock Signal Functions ---
-
 def get_top_gainer():
     top = None
     best = -999
@@ -47,7 +45,6 @@ def get_short_term_pick():
     return "💥 Short-term trade idea: NVDA (High momentum, near breakout zone)"
 
 # --- Crypto Signal Functions ---
-
 def get_ohlcv(symbol):
     try:
         data = exchange.fetch_ohlcv(symbol, timeframe='1d', limit=2)
@@ -82,7 +79,6 @@ def get_short_term_crypto():
     return "💣 Short-term crypto trade: PEPE/USDT (Meme coin with breakout potential)"
 
 # --- Command Handlers ---
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome to Smart Trading Bot!\n"
@@ -124,9 +120,7 @@ async def signalcrypto_l(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def signalcrypto_s(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_short_term_crypto())
 
-# --- Main function to run the bot ---
-
-async def main():
+def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     # Register commands
@@ -142,8 +136,7 @@ async def main():
     app.add_handler(CommandHandler("signalcrypto_s", signalcrypto_s))
 
     print("Bot started...")
-    await app.run_polling()
+    app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
