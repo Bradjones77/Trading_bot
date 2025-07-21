@@ -138,7 +138,7 @@ async def signalcrypto_l(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def signalcrypto_s(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_short_term_crypto())
 
-def main():
+async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     # Register commands
@@ -154,7 +154,7 @@ def main():
     app.add_handler(CommandHandler("signalcrypto_s", signalcrypto_s))
 
     logger.info("Bot started...")
-    app.run_polling()
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
