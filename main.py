@@ -138,7 +138,6 @@ async def signalcrypto_l(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def signalcrypto_s(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_short_term_crypto())
 
-
 async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -157,6 +156,9 @@ async def main():
     logger.info("Bot started...")
     await app.run_polling()
 
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.get_event_loop().run_until_complete(main())
+    except RuntimeError:
+        loop = asyncio.get_event_loop()
+        loop.create_task(main())
