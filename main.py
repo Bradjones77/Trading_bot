@@ -5,41 +5,51 @@ import random
 import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
-import numpy as np  # Add numpy for calculations
+import numpy as np
 
 TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"
-ADMIN_CHAT_ID = 123456789  # Replace this with your actual Telegram user ID
+ADMIN_CHAT_ID = 123456789  # Replace with your Telegram user ID
 
-# Logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# Meme + Major coins
-COINS = [
-    {"id": "bitcoin", "symbol": "BTC/USDT"},
-    {"id": "ethereum", "symbol": "ETH/USDT"},
-    {"id": "solana", "symbol": "SOL/USDT"},
-    {"id": "pepe", "symbol": "PEPE/USDT"},
-    {"id": "dogecoin", "symbol": "DOGE/USDT"},
-    {"id": "shiba-inu", "symbol": "SHIB/USDT"},
-    {"id": "floki", "symbol": "FLOKI/USDT"},
-    {"id": "bonk", "symbol": "BONK/USDT"},
-    {"id": "aptos", "symbol": "APT/USDT"},
+# Crypto coins
+CRYPTO_COINS = [
+    {"id": "bitcoin", "symbol": "BTC"},
+    {"id": "ethereum", "symbol": "ETH"},
+    {"id": "solana", "symbol": "SOL"},
+    {"id": "pepe", "symbol": "PEPE"},
+    {"id": "dogecoin", "symbol": "DOGE"},
+    {"id": "shiba-inu", "symbol": "SHIB"},
+    {"id": "floki", "symbol": "FLOKI"},
+    {"id": "bonk", "symbol": "BONK"},
+    {"id": "aptos", "symbol": "APT"},
 ]
 
-# === In-Memory Trade Tracking ===
+# Stock watchlist (start empty, can add)
+STOCKS = {}
+
+# IPO list: ticker -> {"name": str, "date": str}
+IPOS = {}
+
+# Active trades: key format "crypto:<symbol>" or "stock:<ticker>"
 active_trades = {}
 
-# === GET LIVE PRICE ===
-def get_price(symbol_id):
+# === Helper functions ===
+
+def get_crypto_price(coin_id):
     try:
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol_id}&vs_currencies=usd"
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
         r = requests.get(url, timeout=10)
         data = r.json()
-        return data[symbol_id]['usd']
+        return data[coin_id]['usd']
     except Exception:
         return None
 
-# === GET HISTORICAL DATA FOR TECHNICAL ANALYSIS ===
+def get_stock_price(ticker):
+    # Placeholder: implement with real stock price API or mock
+    # For now return random price to simulate
+    return round(random.uniform(50, 500), 2)
+
 def get_historical_prices(coin_id, days=30):
     try:
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days={days}"
@@ -71,7 +81,7 @@ def compute_rsi(prices, window=14):
         rs = up / down if down != 0 else 0
         rsi = 100 - (100 / (1 + rs)) if down != 0 else 100
         rsi_values.append(rsi)
-    return rsi_values[-1]  # latest RSI
+    return rsi_values[-1]
 
 def analyze_coin(coin_id):
     prices, volumes = get_historical_prices(coin_id, days=30)
@@ -101,141 +111,202 @@ def analyze_coin(coin_id):
 
     return signals
 
-# === /start ===
+# === Commands ===
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome to Bradjones77 AI Trade Bot!\n\n"
-        "Use the following commands:\n"
-        "/signal – 📈 Get top trade signals\n"
-        "/invest <coin> – 💰 Mark trade as invested\n"
-        "/request – 🔄 Request manual signal\n"
-        "/buy – ✅ Simulate buy\n"
-        "/sell – ❌ Simulate sell\n"
-        "/followup – 📬 Check trade outcome\n"
-        "/techsignal <coin> – 🔍 Technical Analysis on coin\n"
+        "Type /help to see all commands."
     )
 
-# === /signal ===
-async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    selected_coins = random.sample(COINS, 3)
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = (
+        "📚 *Available Commands*\n\n"
+        "/cryptosignal — Get crypto trade signals\n"
+        "/stocksignal — Get stock trade signals\n"
+        "/investcrypto <coin> — Mark crypto investment\n"
+        "/investstock <ticker> — Mark stock investment\n"
+        "/techcryptosignal <coin> — Crypto technical analysis\n"
+        "/techstocksignal <ticker> — Stock technical analysis\n"
+        "/followup — Check all active trades\n"
+        "/buy — Simulate buy order\n"
+        "/sell — Simulate sell order\n"
+        "/addstock <ticker> <name> — Add new stock to watchlist\n"
+        "/liststocks — List all stocks tracked\n"
+        "/addipo <ticker> <name> <YYYY-MM-DD> — Add upcoming IPO\n"
+        "/listipos — List upcoming IPOs\n"
+    )
+    await update.message.reply_markdown(help_text)
 
-    signals = []
-    for coin in selected_coins:
-        price = get_price(coin['id'])
+# Crypto signals
+async def cryptosignal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    selected = random.sample(CRYPTO_COINS, min(3, len(CRYPTO_COINS)))
+    message = "📊 *Top Crypto Trade Signals*\n"
+    for coin in selected:
+        price = get_crypto_price(coin['id'])
         if price is None:
             continue
         profit = round(random.uniform(5, 20), 2)
         stop_loss = round(random.uniform(2, 5), 2)
-        signals.append({
-            "coin": coin,
-            "price": price,
-            "profit": profit,
-            "stop_loss": stop_loss
-        })
-
-    signals.sort(key=lambda x: x["profit"], reverse=True)
-
-    message = "📊 *Top Trade Signals*\n"
-    for s in signals:
         message += (
-            f"\n🔹 `{s['coin']['symbol']}` – *{s['profit']}%* profit target\n"
+            f"\n🔹 `{coin['symbol']}` – *{profit}%* profit target\n"
             f"Direction: *BUY*\n"
-            f"Entry: *${s['price']}*\n"
-            f"Stop Loss: *{s['stop_loss']}%*\n"
+            f"Entry: *${price}*\n"
+            f"Stop Loss: *{stop_loss}%*\n"
         )
-
     await update.message.reply_markdown(message)
 
-# === /invest <coin> ===
-async def invest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Stock signals (simulated)
+async def stocksignal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not STOCKS:
+        await update.message.reply_text("⚠️ No stocks tracked yet. Add with /addstock")
+        return
+
+    selected = random.sample(list(STOCKS.items()), min(3, len(STOCKS)))
+    message = "📊 *Top Stock Trade Signals*\n"
+    for ticker, name in selected:
+        price = get_stock_price(ticker)
+        profit = round(random.uniform(3, 15), 2)
+        stop_loss = round(random.uniform(1, 5), 2)
+        message += (
+            f"\n🔹 `{ticker}` ({name}) – *{profit}%* profit target\n"
+            f"Direction: *BUY*\n"
+            f"Entry: *${price}*\n"
+            f"Stop Loss: *{stop_loss}%*\n"
+        )
+    await update.message.reply_markdown(message)
+
+# Invest in crypto
+async def investcrypto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.message.reply_text("⚠️ Please specify a coin. Example: /invest BTC")
+        await update.message.reply_text("⚠️ Please specify a crypto coin. Example: /investcrypto BTC")
         return
-
     coin_symbol = context.args[0].upper()
-
-    match = next((c for c in COINS if c['symbol'].startswith(coin_symbol)), None)
+    match = next((c for c in CRYPTO_COINS if c['symbol'] == coin_symbol), None)
     if not match:
-        await update.message.reply_text(f"❌ Unknown coin: {coin_symbol}")
+        await update.message.reply_text(f"❌ Unknown crypto coin: {coin_symbol}")
         return
-
-    price = get_price(match['id'])
+    price = get_crypto_price(match['id'])
     if price is None:
-        await update.message.reply_text("⚠️ Could not get live price. Try again.")
+        await update.message.reply_text("⚠️ Could not fetch live price. Try again later.")
         return
-
-    active_trades[coin_symbol] = {
+    key = f"crypto:{coin_symbol}"
+    active_trades[key] = {
         "entry_price": price,
         "status": "active",
         "profit_target": 8.0,
         "stop_loss": 5.0
     }
-
-    await update.message.reply_text(
-        f"✅ Trade on {coin_symbol} marked as *invested* at *${price}*.\n"
-        f"Profit target: {active_trades[coin_symbol]['profit_target']}%\n"
-        f"Stop loss: {active_trades[coin_symbol]['stop_loss']}%",
-        parse_mode="Markdown"
+    await update.message.reply_markdown(
+        f"✅ Crypto {coin_symbol} marked as invested at *${price}*.\n"
+        f"Profit target: {active_trades[key]['profit_target']}%\n"
+        f"Stop loss: {active_trades[key]['stop_loss']}%"
     )
 
-# === /request ===
-async def request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔁 Manual trade signal requested...")
-    await signal(update, context)
+# Invest in stock
+async def investstock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("⚠️ Please specify a stock ticker. Example: /investstock AAPL")
+        return
+    ticker = context.args[0].upper()
+    if ticker not in STOCKS:
+        await update.message.reply_text(f"❌ Stock {ticker} is not in watchlist. Add it first with /addstock.")
+        return
+    price = get_stock_price(ticker)
+    key = f"stock:{ticker}"
+    active_trades[key] = {
+        "entry_price": price,
+        "status": "active",
+        "profit_target": 8.0,
+        "stop_loss": 5.0
+    }
+    await update.message.reply_markdown(
+        f"✅ Stock {ticker} marked as invested at *${price}*.\n"
+        f"Profit target: {active_trades[key]['profit_target']}%\n"
+        f"Stop loss: {active_trades[key]['stop_loss']}%"
+    )
 
-# === /buy ===
-async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ Buy order placed (simulated).")
+# Technical analysis crypto
+async def techcryptosignal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("⚠️ Specify crypto coin. Example: /techcryptosignal BTC")
+        return
+    coin_symbol = context.args[0].upper()
+    match = next((c for c in CRYPTO_COINS if c['symbol'] == coin_symbol), None)
+    if not match:
+        await update.message.reply_text(f"❌ Unknown crypto coin: {coin_symbol}")
+        return
+    signals = analyze_coin(match['id'])
+    if not signals:
+        await update.message.reply_text("⚠️ Not enough data for analysis.")
+        return
+    msg = f"🔍 *Technical Analysis for {coin_symbol}*\n\n" + "\n".join(signals)
+    await update.message.reply_markdown(msg)
 
-# === /sell ===
-async def sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ Sell order placed (simulated).")
+# Technical analysis stocks (simulate)
+async def techstocksignal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("⚠️ Specify stock ticker. Example: /techstocksignal AAPL")
+        return
+    ticker = context.args[0].upper()
+    if ticker not in STOCKS:
+        await update.message.reply_text(f"❌ Stock {ticker} not tracked. Add it with /addstock.")
+        return
+    # Simulated signals
+    signals = [
+        "📈 Moving Average crossover (simulated)",
+        "⚠️ RSI neutral (simulated)",
+        "🔊 Volume steady (simulated)"
+    ]
+    msg = f"🔍 *Technical Analysis for {ticker}*\n\n" + "\n".join(signals)
+    await update.message.reply_markdown(msg)
 
-# === /followup ===
+# Follow up on active trades (both stocks and cryptos)
 async def followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not active_trades:
-        await update.message.reply_text("📭 No active trades.")
+        await update.message.reply_text("📭 No active trades at the moment.")
         return
-
     message = "📬 *Trade Follow-Up*\n"
     alerts = []
     to_remove = []
-
-    for coin, trade in active_trades.items():
-        coin_id = next((c['id'] for c in COINS if c['symbol'].startswith(coin)), None)
-        if not coin_id:
-            continue
-
-        current_price = get_price(coin_id)
+    for key, trade in active_trades.items():
+        asset_type, symbol = key.split(":")
+        if asset_type == "crypto":
+            coin = next((c for c in CRYPTO_COINS if c['symbol'] == symbol), None)
+            if not coin:
+                continue
+            current_price = get_crypto_price(coin['id'])
+        else:
+            if symbol not in STOCKS:
+                continue
+            current_price = get_stock_price(symbol)
         if current_price is None:
             continue
 
         entry = trade['entry_price']
         profit_target = trade.get('profit_target', 8.0)
         stop_loss = trade.get('stop_loss', 5.0)
-
         change_percent = round(((current_price - entry) / entry) * 100, 2)
-
         status = "⏳ Still Active"
 
         if change_percent <= -stop_loss:
-            alerts.append(f"⚠️ *Risk Alert*: {coin} is down *{change_percent}%*. Consider exiting!")
+            alerts.append(f"⚠️ *Risk Alert*: {symbol} down *{change_percent}%*. Consider exiting!")
             status = "🔴 Stopped Out"
-            to_remove.append(coin)
+            to_remove.append(key)
         elif change_percent >= profit_target:
-            alerts.append(f"✅ *Profit Alert*: {coin} is up *{change_percent}%*. Consider taking profit!")
+            alerts.append(f"✅ *Profit Alert*: {symbol} up *{change_percent}%*. Consider taking profit!")
             status = "✅ Profit Target Hit"
 
         message += (
-            f"\n🔸 {coin}\n"
+            f"\n🔸 {symbol}\n"
             f"Entry Price: *${entry}*\n"
             f"Current Price: *${current_price}*\n"
             f"P/L: *{change_percent}%*\n"
             f"Status: *{status}*\n"
         )
 
-    for coin in to_remove:
-        del active_trades[coin]
+    for key in to_remove:
+        del active_trades[key]
 
     await update.message.reply_markdown(message)
 
@@ -243,70 +314,102 @@ async def followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
         alert_message = "\n\n".join(alerts)
         await update.message.reply_markdown(f"📢 *Alerts*\n{alert_message}")
 
-# === /techsignal <coin> ===
-async def techsignal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("⚠️ Please specify a coin symbol. Example: /techsignal BTC")
-        return
+# Buy and sell (generic)
+async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✅ Buy order placed (simulated).")
 
-    coin_symbol = context.args[0].upper()
-    match = next((c for c in COINS if c['symbol'].startswith(coin_symbol)), None)
-    if not match:
-        await update.message.reply_text(f"❌ Unknown coin symbol: {coin_symbol}")
-        return
+async def sell(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ Sell order placed (simulated).")
 
-    signals = analyze_coin(match['id'])
-    if not signals:
-        await update.message.reply_text("⚠️ Not enough data to analyze this coin.")
+# Add stock to watchlist
+async def addstock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text("⚠️ Usage: /addstock <ticker> <company name>")
         return
+    ticker = context.args[0].upper()
+    name = " ".join(context.args[1:])
+    STOCKS[ticker] = name
+    await update.message.reply_text(f"✅ Stock {ticker} ({name}) added to watchlist.")
 
-    msg = f"🔍 *Technical Analysis for {match['symbol']}*\n\n" + "\n".join(signals)
-    await update.message.reply_markdown(msg)
+# List stocks
+async def liststocks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not STOCKS:
+        await update.message.reply_text("⚠️ No stocks tracked yet.")
+        return
+    message = "📋 *Tracked Stocks*\n"
+    for ticker, name in STOCKS.items():
+        message += f"\n- `{ticker}`: {name}"
+    await update.message.reply_markdown(message)
+
+# Add IPO
+async def addipo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 3:
+        await update.message.reply_text("⚠️ Usage: /addipo <ticker> <company name> <YYYY-MM-DD>")
+        return
+    ticker = context.args[0].upper()
+    date = context.args[-1]
+    name = " ".join(context.args[1:-1])
+    IPOS[ticker] = {"name": name, "date": date}
+    await update.message.reply_text(f"✅ IPO added: {ticker} ({name}) on {date}")
+
+# List IPOs
+async def listipos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not IPOS:
+        await update.message.reply_text("⚠️ No upcoming IPOs tracked.")
+        return
+    message = "📅 *Upcoming IPOs*\n"
+    for ticker, info in IPOS.items():
+        message += f"\n- `{ticker}`: {info['name']} on {info['date']}"
+    await update.message.reply_markdown(message)
 
 # === Scheduled Signals ===
 def schedule_signal(application):
     async def send_hourly_signal():
-        coin = random.choice(COINS)
-        price = get_price(coin['id'])
+        coin = random.choice(CRYPTO_COINS)
+        price = get_crypto_price(coin['id'])
         if price is None:
             return
-
         profit = round(random.uniform(5, 12), 2)
         stop_loss = round(random.uniform(2, 4), 2)
         success_chance = random.randint(60, 95)
-
         msg = (
-            f"🕒 *Hourly Trade Alert*\n"
-            f"Pair: `{coin['symbol']}`\n"
+            f"🕒 *Hourly Crypto Trade Alert*\n"
+            f"Coin: `{coin['symbol']}`\n"
             f"Price: *${price}*\n"
             f"Target Profit: *{profit}%*\n"
             f"Stop Loss: *{stop_loss}%*\n"
             f"Success Rate: *{success_chance}%*"
         )
-
         await application.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg, parse_mode='Markdown')
 
-    scheduler = BackgroundScheduler(timezone=pytz.utc)
-    scheduler.add_job(lambda: application.create_task(send_hourly_signal()), 'interval', hours=1)
+    scheduler = BackgroundScheduler(timezone=pytz.UTC)
+    scheduler.add_job(lambda: application.create_task(send_hourly_signal()), "interval", hours=1)
     scheduler.start()
 
-# === MAIN ===
+# === Main ===
+
 def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    application = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("signal", signal))
-    app.add_handler(CommandHandler("request", request))
-    app.add_handler(CommandHandler("buy", buy))
-    app.add_handler(CommandHandler("sell", sell))
-    app.add_handler(CommandHandler("followup", followup))
-    app.add_handler(CommandHandler("invest", invest))
-    app.add_handler(CommandHandler("techsignal", techsignal))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("cryptosignal", cryptosignal))
+    application.add_handler(CommandHandler("stocksignal", stocksignal))
+    application.add_handler(CommandHandler("investcrypto", investcrypto))
+    application.add_handler(CommandHandler("investstock", investstock))
+    application.add_handler(CommandHandler("techcryptosignal", techcryptosignal))
+    application.add_handler(CommandHandler("techstocksignal", techstocksignal))
+    application.add_handler(CommandHandler("followup", followup))
+    application.add_handler(CommandHandler("buy", buy))
+    application.add_handler(CommandHandler("sell", sell))
+    application.add_handler(CommandHandler("addstock", addstock))
+    application.add_handler(CommandHandler("liststocks", liststocks))
+    application.add_handler(CommandHandler("addipo", addipo))
+    application.add_handler(CommandHandler("listipos", listipos))
 
-    schedule_signal(app)
+    schedule_signal(application)
 
-    print("✅ Bot is running")
-    app.run_polling()
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
