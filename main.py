@@ -22,7 +22,6 @@ if not TOKEN:
 
 # --- Crypto Data ---
 crypto_list = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "DOGE/USDT", "PEPE/USDT"]
-
 exchange = ccxt.binance()
 
 # --- Crypto Signal Functions ---
@@ -111,7 +110,6 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.get_event_loop().run_until_complete(main())
-    except RuntimeError:
-        loop = asyncio.get_event_loop()
-        loop.create_task(main())
+        asyncio.run(main())
+    except (RuntimeError, KeyboardInterrupt) as e:
+        logger.error(f"Bot stopped: {e}")
