@@ -91,4 +91,70 @@ def get_top_crypto():
         return "❌ Could not fetch crypto data."
 
 def get_long_term_crypto():
-    return "
+    return "🧠 Long-term crypto idea: ETH/USDT (Leading L1 smart contract platform)"
+
+def get_short_term_crypto():
+    return "💣 Short-term crypto trade: PEPE/USDT (Meme coin with breakout potential)"
+
+# --- Telegram Bot Command Handlers ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "👋 Welcome to Smart Trading Bot!\n"
+        "Use /help to see available commands.\n"
+        "This bot scans the market 24/7 for smart trade signals in stocks & crypto."
+    )
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📘 Available Commands:\n\n"
+        "📈 Stock Signals:\n"
+        "  /signalstock     - Top stock gainer today\n"
+        "  /signalstock_l   - Long-term investment stock\n"
+        "  /signalstock_s   - Short-term/day trading stock\n\n"
+        "💰 Crypto Signals:\n"
+        "  /signalcrypto    - Top crypto gainer today\n"
+        "  /signalcrypto_l  - Long-term crypto pick\n"
+        "  /signalcrypto_s  - Short-term crypto play\n\n"
+        "🔍 Other:\n"
+        "  /start           - Bot introduction\n"
+        "  /help            - List of all commands"
+    )
+
+async def signalstock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(get_top_gainer())
+
+async def signalstock_l(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(get_long_term_pick())
+
+async def signalstock_s(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(get_short_term_pick())
+
+async def signalcrypto(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(get_top_crypto())
+
+async def signalcrypto_l(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(get_long_term_crypto())
+
+async def signalcrypto_s(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(get_short_term_crypto())
+
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    # Register commands
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+
+    app.add_handler(CommandHandler("signalstock", signalstock))
+    app.add_handler(CommandHandler("signalstock_l", signalstock_l))
+    app.add_handler(CommandHandler("signalstock_s", signalstock_s))
+
+    app.add_handler(CommandHandler("signalcrypto", signalcrypto))
+    app.add_handler(CommandHandler("signalcrypto_l", signalcrypto_l))
+    app.add_handler(CommandHandler("signalcrypto_s", signalcrypto_s))
+
+    logger.info("Bot started...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
