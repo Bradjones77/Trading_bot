@@ -5,6 +5,7 @@ import random
 import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
+import numpy as np  # Add numpy for calculations
 
 TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"
 ADMIN_CHAT_ID = 123456789  # Replace this with your actual Telegram user ID
@@ -38,6 +39,68 @@ def get_price(symbol_id):
     except Exception:
         return None
 
+# === GET HISTORICAL DATA FOR TECHNICAL ANALYSIS ===
+def get_historical_prices(coin_id, days=30):
+    try:
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days={days}"
+        response = requests.get(url)
+        data = response.json()
+        prices = [p[1] for p in data['prices']]
+        volumes = [v[1] for v in data['total_volumes']]
+        return prices, volumes
+    except Exception:
+        return None, None
+
+def moving_average(data, window):
+    return np.convolve(data, np.ones(window)/window, mode='valid')
+
+def compute_rsi(prices, window=14):
+    deltas = np.diff(prices)
+    seed = deltas[:window]
+    up = seed[seed >= 0].sum() / window
+    down = -seed[seed < 0].sum() / window if any(seed < 0) else 0
+    rs = up / down if down != 0 else 0
+    rsi = 100 - (100 / (1 + rs)) if down != 0 else 100
+
+    rsi_values = [rsi]
+    for delta in deltas[window:]:
+        upval = max(delta, 0)
+        downval = -min(delta, 0)
+        up = (up * (window - 1) + upval) / window
+        down = (down * (window - 1) + downval) / window
+        rs = up / down if down != 0 else 0
+        rsi = 100 - (100 / (1 + rs)) if down != 0 else 100
+        rsi_values.append(rsi)
+    return rsi_values[-1]  # latest RSI
+
+def analyze_coin(coin_id):
+    prices, volumes = get_historical_prices(coin_id, days=30)
+    if not prices or len(prices) < 21:
+        return None
+
+    ma_short = moving_average(prices, 7)[-1]
+    ma_long = moving_average(prices, 21)[-1]
+    rsi = compute_rsi(prices)
+    avg_volume = np.mean(volumes[:-1])
+    current_volume = volumes[-1]
+
+    signals = []
+
+    if ma_short > ma_long:
+        signals.append("📈 Bullish Moving Average crossover")
+    else:
+        signals.append("📉 Bearish Moving Average crossover")
+
+    if rsi < 30:
+        signals.append("⚠️ RSI indicates Oversold (Potential Buy)")
+    elif rsi > 70:
+        signals.append("⚠️ RSI indicates Overbought (Potential Sell)")
+
+    if current_volume > avg_volume * 1.5:
+        signals.append("🔊 Volume Spike Detected")
+
+    return signals
+
 # === /start ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -48,7 +111,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/request – 🔄 Request manual signal\n"
         "/buy – ✅ Simulate buy\n"
         "/sell – ❌ Simulate sell\n"
-        "/followup – 📬 Check trade outcome"
+        "/followup – 📬 Check trade outcome\n"
+        "/techsignal <coin> – 🔍 Technical Analysis on coin\n"
     )
 
 # === /signal ===
@@ -100,12 +164,11 @@ async def invest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Could not get live price. Try again.")
         return
 
-    # Default profit and stop loss thresholds for alerts
     active_trades[coin_symbol] = {
         "entry_price": price,
         "status": "active",
-        "profit_target": 8.0,   # 8% profit to take
-        "stop_loss": 5.0        # 5% loss to exit
+        "profit_target": 8.0,
+        "stop_loss": 5.0
     }
 
     await update.message.reply_text(
@@ -155,13 +218,10 @@ async def followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         status = "⏳ Still Active"
 
-        # Check stop loss breach
         if change_percent <= -stop_loss:
             alerts.append(f"⚠️ *Risk Alert*: {coin} is down *{change_percent}%*. Consider exiting!")
             status = "🔴 Stopped Out"
             to_remove.append(coin)
-
-        # Check profit target reached
         elif change_percent >= profit_target:
             alerts.append(f"✅ *Profit Alert*: {coin} is up *{change_percent}%*. Consider taking profit!")
             status = "✅ Profit Target Hit"
@@ -182,6 +242,26 @@ async def followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if alerts:
         alert_message = "\n\n".join(alerts)
         await update.message.reply_markdown(f"📢 *Alerts*\n{alert_message}")
+
+# === /techsignal <coin> ===
+async def techsignal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("⚠️ Please specify a coin symbol. Example: /techsignal BTC")
+        return
+
+    coin_symbol = context.args[0].upper()
+    match = next((c for c in COINS if c['symbol'].startswith(coin_symbol)), None)
+    if not match:
+        await update.message.reply_text(f"❌ Unknown coin symbol: {coin_symbol}")
+        return
+
+    signals = analyze_coin(match['id'])
+    if not signals:
+        await update.message.reply_text("⚠️ Not enough data to analyze this coin.")
+        return
+
+    msg = f"🔍 *Technical Analysis for {match['symbol']}*\n\n" + "\n".join(signals)
+    await update.message.reply_markdown(msg)
 
 # === Scheduled Signals ===
 def schedule_signal(application):
@@ -221,6 +301,7 @@ def main():
     app.add_handler(CommandHandler("sell", sell))
     app.add_handler(CommandHandler("followup", followup))
     app.add_handler(CommandHandler("invest", invest))
+    app.add_handler(CommandHandler("techsignal", techsignal))
 
     schedule_signal(app)
 
