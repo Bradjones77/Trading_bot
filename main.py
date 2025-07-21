@@ -14,7 +14,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- Your Telegram Bot Token ---
-TOKEN = "YOUR_BOT_TOKEN_HERE"  # Replace with your actual token!
+TOKEN = "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI"  # Your actual token!
 
 # --- Stock and Crypto Data ---
 stock_list = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "TSLA"]
