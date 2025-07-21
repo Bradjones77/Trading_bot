@@ -13,8 +13,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- Your Telegram Bot Token from environment ---
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# --- Load Telegram Bot Token ---
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7951346106:AAEws6VRZYcnDCurG1HZpAh-Y4WgA5BQLWI")
 
 if not TOKEN:
     logger.error("Telegram bot token not found! Please set the TELEGRAM_BOT_TOKEN environment variable.")
@@ -71,7 +71,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome to Smart Trading Bot!\n"
         "Use /help to see available commands.\n"
-        "This bot scans the crypto market 24/7 for smart trade signals."
+        "This bot scans the market 24/7 for smart trade signals in crypto."
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
